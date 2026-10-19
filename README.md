@@ -2,6 +2,8 @@
 
 Dashboard interaktif yang menampilkan hasil analisis kualitas udara di stasiun pemantauan **Dongsi**, Beijing (periode Maret 2013 – Februari 2017).
 
+🔗 **Live Dashboard URL**: [https://submission-app-dicoding.streamlit.app/](https://submission-app-dicoding.streamlit.app/)
+
 ## 📂 Struktur Proyek
 
 ```
@@ -12,25 +14,41 @@ Proyek Akhir Analisis Data/
 ├── data/
 │   └── PRSA_Data_Dongsi_20130301-20170228.csv
 ├── Air_Quality_Proyek_Analisis_Data.ipynb   # Notebook analisis
-└── README.md
+├── README.md
+├── requirements.txt
+└── url.txt
 ```
 
 ## 🚀 Cara Menjalankan Dashboard
 
-1. **Install dependencies**
+### 1. Setup Environment - Shell/Terminal
+```bash
+mkdir proyek_analisis_data
+cd proyek_analisis_data
+pipenv install
+pipenv shell
+pip install -r requirements.txt
+```
 
-   ```bash
-   pip install streamlit pandas numpy matplotlib seaborn
-   ```
+### 2. Setup Environment - Anaconda (Alternatif)
+```bash
+conda create --name main-ds python=3.9
+conda activate main-ds
+pip install -r requirements.txt
+```
 
-2. **Jalankan dashboard**
+### 3. Jalankan Aplikasi Streamlit
+Masuk ke direktori `dashboard` lalu jalankan Streamlit:
+```bash
+cd dashboard
+streamlit run dashboard.py
+```
+atau dapat dijalankan langsung dari direktori root proyek:
+```bash
+streamlit run dashboard/dashboard.py
+```
 
-   ```bash
-   cd dashboard
-   streamlit run dashboard.py
-   ```
-
-3. Buka browser di `http://localhost:8501`
+Setelah dijalankan, buka browser di `http://localhost:8501`.
 
 ## 📊 Pertanyaan Analisis
 

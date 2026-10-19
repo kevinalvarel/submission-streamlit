@@ -14,6 +14,9 @@ st.set_page_config(
     layout="wide",
 )
 
+# Gaya visualisasi global (mengikuti notebook)
+sns.set_theme(style="whitegrid")
+
 # ---------------------------------------------------------------------------
 # Helper: Load & Clean Data
 # ---------------------------------------------------------------------------
@@ -133,31 +136,6 @@ st.markdown("---")
 # =====================================================================
 st.header("1️⃣ Pengaruh Kecepatan Angin & Curah Hujan terhadap PM2.5")
 
-# ---------- Korelasi Cuaca vs Polutan ----------
-st.subheader("🔗 Matriks Korelasi Cuaca vs Polutan")
-
-weather_pollutant_cols = ["PM2.5", "PM10", "RAIN", "WSPM", "TEMP", "DEWP", "PRES"]
-corr_matrix = df_filtered[weather_pollutant_cols].corr()[["PM2.5", "PM10"]].round(3)
-
-fig_corr, ax_corr = plt.subplots(figsize=(6, 5))
-sns.heatmap(
-    corr_matrix,
-    annot=True,
-    cmap="RdBu_r",
-    center=0,
-    vmin=-1,
-    vmax=1,
-    linewidths=0.5,
-    ax=ax_corr,
-)
-ax_corr.set_title("Korelasi Variabel Cuaca terhadap PM2.5 & PM10", fontsize=12, fontweight="bold")
-st.pyplot(fig_corr)
-
-st.caption(
-    "Kecepatan angin (WSPM) memiliki korelasi negatif terkuat terhadap PM2.5, "
-    "menunjukkan bahwa semakin kencang angin → polutan tertiup/tersebar."
-)
-
 # ---------- Analisis Musim Dingin ----------
 st.subheader("❄️ Analisis PM2.5 saat Musim Dingin (Desember – Februari)")
 
@@ -171,71 +149,86 @@ else:
         lambda x: "Hujan (> 0 mm)" if x > 0 else "Tidak Hujan (0 mm)"
     )
 
-    # Tabel ringkasan
-    summary_winter = (
-        winter_df.groupby("kondisi_hujan")[["PM2.5", "WSPM"]]
-        .agg(["count", "mean", "median"])
-        .round(2)
-    )
-    st.dataframe(summary_winter, use_container_width=True)
-
-    # --- Scatter: WSPM vs PM2.5 musim dingin ---
-    fig_scatter, ax_scatter = plt.subplots(figsize=(9, 5))
-    scatter = ax_scatter.scatter(
+    winter_df["kategori_angin"] = pd.cut(
         winter_df["WSPM"],
-        winter_df["PM2.5"],
-        c=winter_df["RAIN"].apply(lambda x: 1 if x > 0 else 0),
-        cmap="coolwarm",
-        alpha=0.35,
-        s=15,
-        edgecolors="none",
+        bins=[-1, 1.0, 2.0, 3.5, 15.0],
+        labels=[
+            "Sangat Lemah (≤1 m/s)",
+            "Lemah (1-2 m/s)",
+            "Sedang (2-3.5 m/s)",
+            "Kencang (>3.5 m/s)",
+        ],
     )
-    ax_scatter.set_xlabel("Kecepatan Angin / WSPM (m/s)", fontsize=11)
-    ax_scatter.set_ylabel("PM2.5 (µg/m³)", fontsize=11)
-    ax_scatter.set_title(
-        "Hubungan Kecepatan Angin dengan PM2.5 saat Musim Dingin",
-        fontsize=12,
+
+    fig, axes = plt.subplots(1, 2, figsize=(15, 6))
+
+    # Subplot 1: Dampak kecepatan angin terhadap PM2.5
+    sns.barplot(
+        data=winter_df,
+        x="kategori_angin",
+        y="PM2.5",
+        palette="Blues_r",
+        errorbar=None,
+        ax=axes[0],
+    )
+    axes[0].set_title(
+        "Rata-rata PM2.5 Berdasarkan Kecepatan Angin\n(Musim Dingin)",
+        fontsize=13,
         fontweight="bold",
     )
-    legend_labels = ["Tidak Hujan", "Hujan"]
-    handles = [
-        plt.Line2D([0], [0], marker="o", color="w", markerfacecolor=c, markersize=8)
-        for c in ["#3b4cc0", "#b40426"]
-    ]
-    ax_scatter.legend(handles, legend_labels, title="Kondisi", loc="upper right")
-    st.pyplot(fig_scatter)
+    axes[0].set_xlabel("Kategori Kecepatan Angin (WSPM)", fontsize=11)
+    axes[0].set_ylabel("Rata-rata Konsentrasi PM2.5 (µg/m³)", fontsize=11)
+    axes[0].tick_params(axis="x", rotation=15)
 
-    st.caption(
-        "Saat kecepatan angin rendah (≤ 1 m/s), PM2.5 menumpuk sangat tinggi. "
-        "Sebaliknya, angin kencang (> 3.5 m/s) menyapu polutan hingga PM2.5 turun drastis."
+    for container in axes[0].containers:
+        axes[0].bar_label(container, fmt="%.1f", padding=3, fontweight="bold")
+
+    # Subplot 2: Perbandingan PM2.5 saat Hujan vs Tidak Hujan
+    rain_summary = winter_df.groupby("kondisi_hujan")[["PM2.5"]].mean().reset_index()
+    sns.barplot(
+        data=rain_summary,
+        x="kondisi_hujan",
+        y="PM2.5",
+        palette=["#e74c3c", "#3498db"],
+        ax=axes[1],
+    )
+    axes[1].set_title(
+        "Perbandingan Rata-rata PM2.5: Hujan vs Tidak Hujan\n(Musim Dingin)",
+        fontsize=13,
+        fontweight="bold",
+    )
+    axes[1].set_xlabel("Kondisi Presipitasi (RAIN)", fontsize=11)
+    axes[1].set_ylabel("Rata-rata Konsentrasi PM2.5 (µg/m³)", fontsize=11)
+
+    for container in axes[1].containers:
+        axes[1].bar_label(container, fmt="%.2f", padding=3, fontweight="bold")
+
+    fig.tight_layout()
+    st.pyplot(fig)
+
+    # Insight (angka dihitung langsung dari data agar tetap sesuai filter)
+    wind_means = winter_df.groupby("kategori_angin", observed=False)["PM2.5"].mean()
+    caption_wind = (
+        "Rata-rata PM2.5 turun drastis seiring menguatnya kecepatan angin: "
+        f"{wind_means.iloc[0]:.1f} µg/m³ saat sangat lemah (≤1 m/s) → "
+        f"{wind_means.iloc[1]:.1f} µg/m³ (1-2 m/s) → "
+        f"{wind_means.iloc[2]:.1f} µg/m³ (2-3.5 m/s) → "
+        f"{wind_means.iloc[3]:.1f} µg/m³ saat kencang (>3.5 m/s). "
     )
 
-    # --- Bar: Rata-rata PM2.5 berdasarkan kategori kecepatan angin ---
-    bins_wind = [0, 1, 2, 3.5, 15]
-    labels_wind = ["≤ 1 m/s", "1‑2 m/s", "2‑3.5 m/s", "> 3.5 m/s"]
-    winter_df["kat_angin"] = pd.cut(winter_df["WSPM"], bins=bins_wind, labels=labels_wind)
-
-    wind_pm = winter_df.groupby("kat_angin", observed=False)["PM2.5"].mean().round(1)
-
-    fig_bar_wind, ax_bw = plt.subplots(figsize=(8, 4))
-    colors_wind = ["#e74c3c", "#e67e22", "#f1c40f", "#2ecc71"]
-    bars = ax_bw.bar(wind_pm.index.astype(str), wind_pm.values, color=colors_wind)
-    for b in bars:
-        ax_bw.text(
-            b.get_x() + b.get_width() / 2,
-            b.get_height() + 2,
-            f"{b.get_height():.1f}",
-            ha="center",
-            fontweight="bold",
+    rain_means = winter_df.groupby("kondisi_hujan")[["PM2.5", "WSPM"]].mean()
+    if {"Hujan (> 0 mm)", "Tidak Hujan (0 mm)"}.issubset(rain_means.index):
+        caption_rain = (
+            "Sebaliknya, saat turun hujan (RAIN > 0 mm) rata-rata PM2.5 justru lebih tinggi "
+            f"({rain_means.loc['Hujan (> 0 mm)', 'PM2.5']:.2f} µg/m³) dibandingkan saat tidak hujan "
+            f"({rain_means.loc['Tidak Hujan (0 mm)', 'PM2.5']:.2f} µg/m³), karena kecepatan angin "
+            f"cenderung melemah ({rain_means.loc['Hujan (> 0 mm)', 'WSPM']:.2f} m/s) dan kelembapan udara "
+            "yang tinggi menahan partikel polutan di permukaan."
         )
-    ax_bw.set_xlabel("Kategori Kecepatan Angin", fontsize=11)
-    ax_bw.set_ylabel("Rata‑rata PM2.5 (µg/m³)", fontsize=11)
-    ax_bw.set_title(
-        "Rata‑rata PM2.5 per Kategori Kecepatan Angin (Musim Dingin)",
-        fontsize=12,
-        fontweight="bold",
-    )
-    st.pyplot(fig_bar_wind)
+    else:
+        caption_rain = "Tidak ada observasi hujan pada filter yang dipilih."
+
+    st.caption(caption_wind + caption_rain)
 
 st.markdown("---")
 
@@ -244,87 +237,83 @@ st.markdown("---")
 # =====================================================================
 st.header("2️⃣ Konsentrasi NO₂ & CO: Jam Sibuk Pagi vs Jam Normal")
 
-# Tabel Perbandingan
-rush_summary = (
-    df_filtered.groupby("kategori_jam")[["NO2", "CO", "PM2.5"]]
-    .agg(["mean", "median", "max"])
-    .round(2)
+# ---------- Tren Harian (Siklus 24 Jam) ----------
+st.subheader("⏰ Tren Rata-rata NO₂ & CO per Jam (Siklus 24 Jam)")
+
+hourly_emissions = df_filtered.groupby("hour")[["NO2", "CO"]].mean().reset_index()
+
+fig_hourly, axes_hourly = plt.subplots(2, 1, figsize=(14, 9), sharex=True)
+
+# Subplot 1: Tren harian NO2
+sns.lineplot(
+    data=hourly_emissions,
+    x="hour",
+    y="NO2",
+    marker="o",
+    color="#d35400",
+    linewidth=2.5,
+    ax=axes_hourly[0],
+    label="Rata-rata NO2",
 )
-st.dataframe(rush_summary, use_container_width=True)
-
-# --- Grouped Bar Chart ---
-rush_means = df_filtered.groupby("kategori_jam")[["NO2", "CO"]].mean().round(2)
-
-fig_rush, axes_rush = plt.subplots(1, 2, figsize=(12, 5))
-
-for idx, col in enumerate(["NO2", "CO"]):
-    ax = axes_rush[idx]
-    vals = rush_means[col]
-    colors_rush = ["#3498db", "#e74c3c"]
-    b = ax.bar(vals.index.astype(str), vals.values, color=colors_rush)
-    for bar in b:
-        ax.text(
-            bar.get_x() + bar.get_width() / 2,
-            bar.get_height() + 1,
-            f"{bar.get_height():.1f}",
-            ha="center",
-            fontweight="bold",
-            fontsize=10,
-        )
-    ax.set_title(f"Rata‑rata {col}", fontsize=12, fontweight="bold")
-    ax.set_ylabel(f"{col} (µg/m³)", fontsize=10)
-
-fig_rush.suptitle(
-    "Perbandingan Rata‑rata Polutan: Jam Sibuk Pagi vs Jam Normal",
+axes_hourly[0].axvspan(7, 9, color="#f39c12", alpha=0.3, label="Jam Sibuk Pagi (07:00 - 09:00)")
+axes_hourly[0].axvspan(21, 23, color="#8e44ad", alpha=0.2, label="Puncak Akumulasi Malam (21:00 - 23:00)")
+axes_hourly[0].set_title(
+    "Tren Rata-rata Konsentrasi NO2 per Jam (Siklus 24 Jam)",
     fontsize=13,
     fontweight="bold",
-    y=1.02,
 )
-fig_rush.tight_layout()
-st.pyplot(fig_rush)
+axes_hourly[0].set_ylabel("Konsentrasi NO2 (µg/m³)", fontsize=11)
+axes_hourly[0].legend(loc="upper left")
 
-# --- Tren Harian (24 jam) ---
-st.subheader("⏰ Tren Konsentrasi Polutan per Jam (0–23)")
-
-hourly_trend = df_filtered.groupby("hour")[["NO2", "CO", "PM2.5", "O3"]].mean().round(2)
-
-pollutant_choice = st.multiselect(
-    "Pilih polutan yang ingin ditampilkan:",
-    options=["NO2", "CO", "PM2.5", "O3"],
-    default=["NO2", "CO"],
+# Subplot 2: Tren harian CO
+sns.lineplot(
+    data=hourly_emissions,
+    x="hour",
+    y="CO",
+    marker="s",
+    color="#2c3e50",
+    linewidth=2.5,
+    ax=axes_hourly[1],
+    label="Rata-rata CO",
 )
+axes_hourly[1].axvspan(7, 9, color="#f39c12", alpha=0.3, label="Jam Sibuk Pagi (07:00 - 09:00)")
+axes_hourly[1].axvspan(21, 23, color="#8e44ad", alpha=0.2, label="Puncak Akumulasi Malam (21:00 - 23:00)")
+axes_hourly[1].set_title(
+    "Tren Rata-rata Konsentrasi CO per Jam (Siklus 24 Jam)",
+    fontsize=13,
+    fontweight="bold",
+)
+axes_hourly[1].set_xlabel("Jam (00:00 - 23:00)", fontsize=11)
+axes_hourly[1].set_ylabel("Konsentrasi CO (µg/m³)", fontsize=11)
+axes_hourly[1].set_xticks(range(0, 24))
+axes_hourly[1].legend(loc="upper left")
 
-if pollutant_choice:
-    fig_hourly, ax_hourly = plt.subplots(figsize=(11, 5))
-    palette = {"NO2": "#e74c3c", "CO": "#3498db", "PM2.5": "#e67e22", "O3": "#2ecc71"}
-    for p in pollutant_choice:
-        ax_hourly.plot(
-            hourly_trend.index,
-            hourly_trend[p],
-            marker="o",
-            markersize=5,
-            label=p,
-            color=palette.get(p, None),
-            linewidth=2,
-        )
-    ax_hourly.set_xlabel("Jam (0–23)", fontsize=11)
-    ax_hourly.set_ylabel("Konsentrasi Rata‑rata", fontsize=11)
-    ax_hourly.set_title("Tren Rata‑rata Polutan per Jam dalam Sehari", fontsize=13, fontweight="bold")
-    ax_hourly.legend()
-    ax_hourly.set_xticks(range(0, 24))
-    ax_hourly.axvspan(7, 9, alpha=0.12, color="red", label="Jam Sibuk Pagi")
-    st.pyplot(fig_hourly)
+fig_hourly.tight_layout()
+st.pyplot(fig_hourly)
+
+# Insight (angka dihitung langsung dari data agar tetap sesuai filter)
+if hourly_emissions.empty:
+    st.warning("Tidak ada data pada filter yang dipilih.")
+else:
+    rush_hours = hourly_emissions[hourly_emissions["hour"].between(7, 9)]
+    night_hours = hourly_emissions[hourly_emissions["hour"].between(21, 23)]
+    peak_hour = int(rush_hours.loc[rush_hours["NO2"].idxmax(), "hour"])
+    low_hour = int(hourly_emissions.loc[hourly_emissions["NO2"].idxmin(), "hour"])
 
     st.caption(
-        "Area merah muda menandakan jam sibuk pagi (07–09). "
-        "Puncak akumulasi polutan tertinggi justru terjadi pada malam hari (21–23), "
-        "akibat aktivitas logistik dan fenomena inversi suhu."
+        "Terlihat pola dua puncak (bimodal): konsentrasi menurun pada dini hari, lalu kembali "
+        f"menanjak pada jam sibuk pagi (07.00–09.00) dengan puncak pukul {peak_hour:02d}.00 "
+        f"(rata-rata jam sibuk NO₂ ≈ {rush_hours['NO2'].mean():.2f} µg/m³; "
+        f"CO ≈ {rush_hours['CO'].mean():.2f} µg/m³). Memasuki siang hingga sore hari, kedua gas "
+        f"turun tajam dan mencapai titik terendah pada pukul {low_hour:02d}.00, sebelum kembali "
+        f"merangkak naik hingga mencapai puncak tertinggi pada malam hari pukul 21.00–23.00 "
+        f"(NO₂ ≈ {night_hours['NO2'].mean():.2f} µg/m³; CO ≈ {night_hours['CO'].mean():.2f} µg/m³) "
+        "akibat akumulasi emisi dan fenomena inversi suhu malam hari."
     )
-else:
-    st.info("Silakan pilih minimal satu polutan untuk menampilkan grafik.")
 
 # Tabel: 5 jam dengan NO2 tertinggi
 st.subheader("🏆 Top‑5 Jam dengan Konsentrasi NO₂ Tertinggi")
+hourly_trend = df_filtered.groupby("hour")[["NO2", "CO", "PM2.5", "O3"]].mean().round(2)
 top5_no2 = hourly_trend.sort_values(by="NO2", ascending=False).head(5)
 st.dataframe(top5_no2, use_container_width=True)
 
@@ -355,6 +344,7 @@ bars_aqi = ax_aqi.barh(
     aqi_dist["Persentase (%)"],
     color=aqi_colors,
 )
+ax_aqi.invert_yaxis()
 for bar in bars_aqi:
     ax_aqi.text(
         bar.get_width() + 0.5,
