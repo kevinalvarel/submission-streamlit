@@ -22,6 +22,7 @@ Proyek Akhir Analisis Data/
 ## 🚀 Cara Menjalankan Dashboard
 
 ### 1. Setup Environment - Shell/Terminal
+
 ```bash
 mkdir proyek_analisis_data
 cd proyek_analisis_data
@@ -31,19 +32,24 @@ pip install -r requirements.txt
 ```
 
 ### 2. Setup Environment - Anaconda (Alternatif)
+
 ```bash
-conda create --name main-ds python=3.9
+conda create --name main-ds python=3.11
 conda activate main-ds
 pip install -r requirements.txt
 ```
 
 ### 3. Jalankan Aplikasi Streamlit
+
 Masuk ke direktori `dashboard` lalu jalankan Streamlit:
+
 ```bash
 cd dashboard
 streamlit run dashboard.py
 ```
+
 atau dapat dijalankan langsung dari direktori root proyek:
+
 ```bash
 streamlit run dashboard/dashboard.py
 ```
